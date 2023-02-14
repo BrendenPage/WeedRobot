@@ -31,6 +31,20 @@ void stepper_half_drive(int step);
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+#define SPRAYER_PIN_CLASS   
+#define SPRAYER_CONTROL_PIN 
+#define SPRAYER_DELAY         1000
+
+// These defines list the pins for the
+// brushless motors that drive the chassis
+#define MOTOR_PIN_CLASS GPIOB
+#define MOTOR_FORWARD_1 GPIO_PIN_15
+#define MOTOR_REVERSE_1 GPIO_PIN_14
+#define MOTOR_FORWARD_2 GPIO_PIN_13
+#define MOTOR_REVERSE_2 GPIO_PIN_12
+#define MOTOR_DELAY     750
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -44,6 +58,11 @@ ADC_HandleTypeDef hadc3;
 /* USER CODE BEGIN PV */
 uint32_t VR;
 
+// Global variable that determines the state of the
+// arm stepper motor
+// 0: halt, 1: left, 2: right
+short AIM;
+
 
 /* USER CODE END PV */
 
@@ -52,7 +71,27 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC3_Init(void);
 /* USER CODE BEGIN PFP */
+
+
+
+
 void loop_motor_wait(int ticks);
+
+// Takes a state input and sets the motor pins
+// to execute the movement as follows:
+// 0 - halt
+// 1 - forward
+// 2 - backward
+// 3 - left
+// 4 - right
+void change_motor_state(short state);
+
+// Takes the arm motor's current state and returns the
+// updated state with respect to the ARM global variable
+int check_aim(int state);
+
+
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -91,8 +130,9 @@ int main(void)
   MX_ADC3_Init();
   /* USER CODE BEGIN 2 */
   HAL_ADC_Start_DMA(&hadc3, &VR, 1);
-
+  short arm_motor_state = 0;
   /* USER CODE END 2 */
+
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -101,26 +141,30 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  //Drive forward
-	  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0)) {
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);// PIN B15 off
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);// PIN B14 off
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET);// PIN B13 off
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);// PIN B12 off
-		  loop_motor_wait(750);
-//		  HAL_Delay(750);
-	  }
-	  else {
-	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_SET);// PIN B15 on
-	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);// PIN B14 off
-	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET);// PIN B13 on
-	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);// PIN B12 off
-	      loop_motor_wait(750);
-//	      HAL_Delay(750);
-	  }
 
 
+    if (SPRAY) {
+      // Turn on the sprayer
+      HAL_GPIO_WritePin(SPRAYER_PIN_CLASS, SPRAYER_CONTROL_PIN, GPIO_PIN_SET);
+      sprayer_delay = SPRAYER_DELAY;
+    } else if (sprayer_delay == 0) {
+      // Turn off the sprayer
+      HAL_GPIO_WritePin(SPRAYER_PIN_CLASS, SPRAYER_CONTROL_PIN, GPIO_PIN_RESET);
+    }
 
+    if (--motor_delay == 0 && HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0)) {
+      change_motor_state(0);
+      motor_delay = MOTOR_DELAY;
+    }
+    else if (motor_delay == 0) {
+      change_motor_state(1);
+      motor_delay = MOTOR_DELAY;
+    }
+
+    arm_motor_state = check_aim(arm_motor_state);
+    stepper_half_drive(arm_motor_state);
+
+    HAL_Delay(1);
   }
   /* USER CODE END 3 */
 }
@@ -288,88 +332,142 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 void loop_motor_wait(int ticks) {
-	int step = 0;
-	while (ticks != 0) {
-	stepper_half_drive(step);
-	  // Get ADC value
-	  HAL_ADC_Start(&hadc3);
-	  HAL_ADC_PollForConversion(&hadc3, 1);
-	  VR = HAL_ADC_GetValue(&hadc3);
-	  if (VR < 1365) {
-		  if (step == 0) {
-			  step = 7;
-		  } else {
-			  step--;
-		  }
-	  } else if (VR > 1365*2) {
-		  step = (step + 1) % 8;
-	  }
-	  HAL_Delay(1);
-	  ticks--;
-	}
+  int step = 0;
+  while (ticks != 0) {
+    stepper_half_drive(step);
+    // Get ADC value
+    HAL_ADC_Start(&hadc3);
+    HAL_ADC_PollForConversion(&hadc3, 1);
+    VR = HAL_ADC_GetValue(&hadc3);
+    if (VR < 1365) {
+      if (step == 0) {
+        step = 7;
+      } else {
+        step--;
+      }
+    } else if (VR > 1365*2) {
+      step = (step + 1) % 8;
+    }
+    HAL_Delay(1);
+    ticks--;
+  }
 }
 
 void stepper_half_drive (int step)
 {
-	switch (step){
-		case 0:
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);   // IN1
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);   // IN2
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);   // IN3
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);   // IN4
-			  break;
+  switch (step){
+    case 0:
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);   // IN1
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);   // IN2
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);   // IN3
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);   // IN4
+        break;
 
-		case 1:
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);   // IN1
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);   // IN2
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);   // IN3
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);   // IN4
-			  break;
+    case 1:
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);   // IN1
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);   // IN2
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);   // IN3
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);   // IN4
+        break;
 
-		case 2:
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);   // IN1
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);   // IN2
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);   // IN3
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);   // IN4
-			  break;
+    case 2:
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);   // IN1
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);   // IN2
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);   // IN3
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);   // IN4
+        break;
 
-		case 3:
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);   // IN1
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);   // IN2
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);   // IN3
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);   // IN4
-			  break;
+    case 3:
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);   // IN1
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);   // IN2
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);   // IN3
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);   // IN4
+        break;
 
-		case 4:
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);   // IN1
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);   // IN2
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);   // IN3
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);   // IN4
-			  break;
+    case 4:
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);   // IN1
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);   // IN2
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);   // IN3
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);   // IN4
+        break;
 
-		case 5:
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);   // IN1
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);   // IN2
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);   // IN3
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);   // IN4
-			  break;
+    case 5:
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);   // IN1
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);   // IN2
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);   // IN3
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);   // IN4
+        break;
 
-		case 6:
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);   // IN1
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);   // IN2
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);   // IN3
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);   // IN4
-			  break;
+    case 6:
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);   // IN1
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);   // IN2
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);   // IN3
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);   // IN4
+        break;
 
-		case 7:
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);   // IN1
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);   // IN2
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);   // IN3
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);   // IN4
-			  break;
+    case 7:
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);   // IN1
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);   // IN2
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);   // IN3
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);   // IN4
+        break;
 
-		}
+    }
 }
+
+
+void change_motor_state(short state)
+{
+  switch(state){
+    case 0:
+    // Halt
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_RESET);
+    case 1:
+    // Forward
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_RESET);
+    case 2:
+    // Backward
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_SET);
+    case 3:
+    // Left
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_RESET);
+    case 4:
+    // Left
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_SET);
+  }
+}
+
+int check_aim(int state) {
+  // Get ADC value
+  if (AIM == 1) {
+    if (state == 0) {
+      state = 7;
+    } else {
+      state--;
+    }
+  } else if (AIM == 2) {
+    state = (state + 1) % 8;
+  }
+  return state;
+}
+
+
+
 /* USER CODE END 4 */
 
 /**
@@ -399,7 +497,7 @@ void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+    ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
