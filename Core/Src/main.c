@@ -22,6 +22,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 void stepper_half_drive(int step);
+void stepper_step_angle (float angle, int direction, int rpm);
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -351,6 +353,37 @@ void loop_motor_wait(int ticks) {
     HAL_Delay(1);
     ticks--;
   }
+}
+
+// BLOCKING OPERATION, TAKES <<ANGLE>> MILLISECONDS TO COMPLETE
+void stepper_step_angle (float angle, int direction)
+{
+	float anglepersequence = 0.703125;  // 360 = 512 sequences
+	int numberofsequences = (int) (angle/anglepersequence);
+
+	for (int seq=0; seq<numberofsequences; seq++)
+	{
+		if (direction == 0)  // for clockwise
+		{
+			for (int step=7; step>=0; step--)
+			{
+				stepper_half_drive(step);
+        HAL_Delay(1);
+				// stepper_set_rpm(rpm);
+			}
+
+		}
+
+		else if (direction == 1)  // for anti-clockwise
+		{
+			for (int step=0; step<8; step++)
+			{
+				stepper_half_drive(step);
+        HAL_Delay(1);
+				// stepper_set_rpm(rpm);
+			}
+		}
+	}
 }
 
 void stepper_half_drive (int step)
