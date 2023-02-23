@@ -39,8 +39,10 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+//Timer 6, used for message tranmission delay
 TIM_HandleTypeDef htim6;
 
+//Enabled USART2 for communication, if you want to change this, please change the STM32 config file.
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
@@ -64,17 +66,21 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+//Timer interrupt callback, used for message sending
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   memcpy(dma_tx_buffer, dma_rx_buffer, BUFFER_SIZE);
   HAL_UART_Transmit_DMA(&huart2, dma_tx_buffer, BUFFER_SIZE);
 }
 
+//UART receive interrupt callback, used for receiving message using DMA
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
   HAL_UART_Receive_DMA(&huart2, dma_rx_buffer, BUFFER_SIZE);
 }
 
+//Initialize the buffer
+//Not important
 void DMA_Message_Init(void)
 {
 	uint16_t i;
