@@ -133,6 +133,24 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_ADC_Start_DMA(&hadc3, &VR, 1);
   short arm_motor_state = 0;
+
+// ADDED CODE FOR THE PWM MOTOR DRIVER
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	
+	
+// Need to enable TIMER 3, setting the Clock Source to th Internal Clock
+// Set CHANNEL 1 and CHANNEL 2 to PWM Generation, This correlates with pins PC6 and PA7 respectively
+// In the configuration, set the Counter mode to up, Counter period to 4095, and enable auto-reload preload
+// Lastly for both PWM Generation Channels, set Mode to PWM mode 1, and the Pulse to 4095 (this may be adjusted for different speeds)
+// I don't think the other settings are needed to be modified. (if any problems then contact Tyler)
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);	
+
+// NOTE: Please enable PB15 and PB14 for output. NEEDED FOR GOING BACKWARDS.	
+	
+// The duty cycle of the PWM signal is based on the ratio of the inputted value and the clock period (4095) 	
+	
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	
   /* USER CODE END 2 */
 
 
@@ -454,34 +472,63 @@ void change_motor_state(short state)
   switch(state){
     case 0:
     // Halt
-      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_RESET);
+	  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);
+	  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);// PIN B15 off	
+		  
+/*      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_RESET);
       HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_RESET);
       HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_RESET); */
+		
+	
     case 1:
     // Forward
-      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_SET);
+	// 4095 correlates with max speed (100% duty cycle) in the forward direction,	  
+	  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 4095);
+	  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 4095);
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);// PIN B15 off	
+		  
+/*      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_SET);
       HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_RESET);
       HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_SET);
-      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_RESET); */  
+	  
+	
     case 2:
-    // Backward
-      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_RESET);
+	// Backward
+	// 2048 correlates with max speed (50% duty cycle) in the backward direction,	  
+	  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 2048);
+	  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 2048);
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_SET);// PIN B15 on	
+		  
+    /*  HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_RESET);
       HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_SET);
       HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_SET);
-    case 3:
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_SET);	*/  
+  
+    case 3:    // NOTE THE LEFT AND RIGHT TURNS MAY NEED TO BE CHANGED DEPENDING ON RSULTS OF TESTING
     // Left
-      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_RESET);
+	  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 4095);
+	  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);         			// FIX ME!!!!!!
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);// PIN B15 off
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);// PIN B14 on
+		  
+    /*  HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_RESET);
       HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_SET);
       HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_SET);
-      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_RESET);	*/
     case 4:
-    // Left
-      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_SET);
+    // Right
+	  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);
+	  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 4095);				// FIX ME!!!!!!
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_SET);// PIN B15 on
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);// PIN B15 on
+		  
+    /*  HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_SET);
       HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_RESET);
       HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_SET);	*/
   }
 }
 
