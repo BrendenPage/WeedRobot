@@ -46,8 +46,11 @@ extern "C" {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
+#define BUFFER_SIZE 2
 
 /* USER CODE END EM */
+
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
@@ -59,6 +62,8 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 
 /* USER CODE BEGIN Private defines */
+extern uint8_t dma_tx_buffer[BUFFER_SIZE];
+extern uint8_t dma_rx_buffer[BUFFER_SIZE];
 
 /* USER CODE END Private defines */
 
