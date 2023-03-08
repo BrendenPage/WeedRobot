@@ -38,7 +38,8 @@
 
 #define SPRAYER_PIN_CLASS   GPIOB
 #define SPRAYER_CONTROL_PIN GPIO_PIN_12
-#define SPRAYER_DELAY         1000
+// Number of milliseconds we want to have the sprayer on for
+#define SPRAYER_DELAY       200
 
 // These defines list the pins for the
 // brushless motors that drive the chassis
@@ -48,10 +49,15 @@
 #define MOTOR_B         3
 #define MOTOR_BS        4
 
+#define TURN_MAX		12
+#define TURN_MIN	   -12
 
-#define CAMERA_HALT	    2000
-#define IGNORE_DELAY    2000
-#define RESET_COUNT     5000
+#define CAMERA_HALT	    15
+
+// Number of milliseconds we want to ignore inputs during reset
+#define IGNORE_DELAY    5000
+// Time to wait after we've lost the object to reset
+#define RESET_COUNT     500
 
 /* USER CODE END PD */
 
@@ -79,11 +85,22 @@ uint8_t dma_rx_buffer[BUFFER_SIZE];
 uint8_t global_status;
 int direction;
 float degree;
+// The amount of time the camera has been held in place
 uint16_t spray_counter_1;
+
+// The amount of time the chassis has been halted
 uint16_t spray_counter_2;
+
+// The amount of time the sprayer has remaining to spray
+int16_t spray_time;
+
+// The amount of time the object has been out of frame
 uint16_t reset_counter;
-bool start_turn;
-bool spray_status;
+
+// The amount of time remaining in which we ignore input
+int16_t ignore_counter;
+
+// Angle the camera has turned to allow us to reset to center
 int turn_counter;
 
 
@@ -135,81 +152,185 @@ int check_aim(int state);
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
+//  memcpy(dma_rx_buffer, dma_tx_buffer, BUFFER_SIZE);
+//  if (global_status == 1)
+//  {
+//      //Check for Stepper motor command
+//	  if(dma_tx_buffer[0] == 'R')
+//	  {
+//		  direction = 1;
+//		  degree = 10.0;
+//		  spray_counter_1 = 0;
+//		  reset_counter = 0;
+//	  }
+//	  else if(dma_tx_buffer[0] == 'r')
+//	  {
+//		  direction = 1;
+//		  degree = 5.0;
+//		  spray_counter_1 = 0;
+//		  reset_counter = 0;
+//	  }
+//	  else if(dma_tx_buffer[0] == 'L')
+//	  {
+//		  direction = 0;
+//		  degree = 10.0;
+//		  spray_counter_1 = 0;
+//		  reset_counter = 0;
+//	  }
+//	  else if(dma_tx_buffer[0] == 'l')
+//	  {
+//		  direction = 0;
+//		  degree = 5.0;
+//		  spray_counter_1 = 0;
+//		  reset_counter = 0;
+//	  }
+//	  else if (dma_tx_buffer[0] == 'H')
+//	  {
+//		  direction = 2;
+//		  degree = 0.0;
+//		  reset_counter = 0;
+//		  if(spray_counter_1 <= CAMERA_HALT)
+//		  {
+//			  ++spray_counter_1;
+//		  }
+//	  }
+//	  else if (dma_tx_buffer[0] == 'M')
+//	  {
+//		  direction = 2;
+//		  degree = 0.0;
+//		  if (reset_counter <= RESET_COUNT)
+//		  {
+//			  ++reset_counter;
+//		  }
+//	  }
+//	  else
+//	  {
+//		  direction = 2;
+//		  degree = 0.0;
+//	  }
+//
+//
+//	  if(dma_tx_buffer[1] == 'F')
+//	  {
+//		  motor_state_selector(MOTOR_F);
+//		  spray_counter_2 = 0;
+//		  reset_counter = 0;
+//
+//	  }
+//	  else if(dma_tx_buffer[1] == 'S')
+//	  {
+//		  motor_state_selector(MOTOR_FS);
+//		  spray_counter_2 = 0;
+//		  reset_counter = 0;
+//	  }
+//	  else if(dma_tx_buffer[1] == 'H')
+//	  {
+//		  motor_state_selector(MOTOR_HALT);
+//		  reset_counter = 0;
+//		  if(spray_counter_2 <= CAMERA_HALT)
+//		  {
+//			  ++spray_counter_2;
+//		  }
+//	  }
+//	  else
+//	  {
+//		  // We did not detect the object, halt and wait for further info
+//		  motor_state_selector(MOTOR_HALT);
+//	  }
+//
+//  }
+
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
   memcpy(dma_tx_buffer, dma_rx_buffer, BUFFER_SIZE);
   if (global_status == 1)
   {
-      //Check for Stepper motor command
+	  //Check for Stepper motor command
 	  if(dma_tx_buffer[0] == 'R')
 	  {
 		  direction = 1;
 		  degree = 10.0;
 		  spray_counter_1 = 0;
-		  start_turn = true;
+		  reset_counter = 0;
 	  }
 	  else if(dma_tx_buffer[0] == 'r')
 	  {
 		  direction = 1;
 		  degree = 5.0;
 		  spray_counter_1 = 0;
-		  start_turn = true;
+		  reset_counter = 0;
 	  }
 	  else if(dma_tx_buffer[0] == 'L')
 	  {
 		  direction = 0;
 		  degree = 10.0;
 		  spray_counter_1 = 0;
-		  start_turn = true;
+		  reset_counter = 0;
 	  }
 	  else if(dma_tx_buffer[0] == 'l')
 	  {
 		  direction = 0;
 		  degree = 5.0;
 		  spray_counter_1 = 0;
-		  start_turn = true;
+		  reset_counter = 0;
 	  }
 	  else if (dma_tx_buffer[0] == 'H')
 	  {
 		  direction = 2;
 		  degree = 0.0;
-		  spray_counter_1++;
-		  start_turn = true;
+		  reset_counter = 0;
+		  if(spray_counter_1 <= CAMERA_HALT)
+		  {
+			  ++spray_counter_1;
+		  }
+	  }
+	  else if (dma_tx_buffer[0] == 'M')
+	  {
+		  direction = 2;
+		  degree = 0.0;
+		  if (reset_counter <= RESET_COUNT)
+		  {
+			  ++reset_counter;
+		  }
 	  }
 	  else
 	  {
 		  direction = 2;
 		  degree = 0.0;
-		  reset_counter ++;
 	  }
-
 
 
 	  if(dma_tx_buffer[1] == 'F')
 	  {
 		  motor_state_selector(MOTOR_F);
 		  spray_counter_2 = 0;
+		  reset_counter = 0;
 
 	  }
 	  else if(dma_tx_buffer[1] == 'S')
 	  {
 		  motor_state_selector(MOTOR_FS);
 		  spray_counter_2 = 0;
+		  reset_counter = 0;
 	  }
 	  else if(dma_tx_buffer[1] == 'H')
 	  {
 		  motor_state_selector(MOTOR_HALT);
-		  spray_counter_2 ++ ;
+		  reset_counter = 0;
+		  if(spray_counter_2 <= CAMERA_HALT)
+		  {
+			  ++spray_counter_2;
+		  }
 	  }
 	  else
 	  {
+		  // We did not detect the object, halt and wait for further info
 		  motor_state_selector(MOTOR_HALT);
 	  }
 
   }
-
-}
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
   HAL_UART_Receive_DMA(&huart2, dma_rx_buffer, BUFFER_SIZE);
 }
 
@@ -226,14 +347,15 @@ void Counter_Init(void)
 {
 	spray_counter_1 = 0;
 	spray_counter_2 = 0;
+	spray_time = -1;
 	reset_counter = 0;
+	ignore_counter = -1;
 	turn_counter = 0;
 }
 
 void Global_Status_Init(void)
 {
 	global_status = 0;
-	spray_status = false;
 }
 
 void Stepper_Motor_Reset(void)
@@ -241,14 +363,19 @@ void Stepper_Motor_Reset(void)
 	if(turn_counter < 0)
 	{
 		direction = 0;
+		degree = (float)(turn_counter * 5);
+		stepper_step_angle(degree, direction);
 	}
-	else
+	else if (turn_counter > 0)
 	{
 		direction = 1;
+		degree = (float)(turn_counter * 5);
+		stepper_step_angle(degree, direction);
 	}
 
-	degree = (float)(turn_counter * 5);
-	stepper_step_angle(degree, direction);
+//	degree = (float)(turn_counter * 5);
+//	stepper_step_angle(degree, direction);
+	turn_counter = 0;
 }
 
 /* USER CODE END 0 */
@@ -290,57 +417,78 @@ int main(void)
   HAL_ADC_Start_DMA(&hadc3, &VR, 1);
   DMA_Message_Init();
   HAL_UART_Receive_DMA(&huart2, dma_rx_buffer, BUFFER_SIZE);
-  HAL_TIM_Base_Start_IT(&htim6);
+//  HAL_TIM_Base_Start_IT(&htim6);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
   Global_Status_Init();
   Counter_Init();
   /* USER CODE END 2 */
-
+  bool test = true;
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+//	  if (test) {
+//		  test = false;
+//		  stepper_step_angle(60.0, 1);
+//	  }
 
 	  if (global_status == 1)
 	  {
-		  stepper_step_angle(degree, direction);
+		  // Rotate sprayer nozzle and track total degrees
+		  int turn_amount = 0;
 		  if(direction == 0)
 		  {
 			  if(degree == 10.0)
 			  {
-				  turn_counter  = turn_counter + 2;
+				  turn_amount = 2;
 			  }
 			  else if(degree == 5.0)
 			  {
-				  turn_counter  = turn_counter + 1;
+				  turn_amount = 1;
 			  }
 		  }
 		  else if (direction == 1)
 		  {
 			  if(degree == 10.0)
 			  {
-				  turn_counter  = turn_counter - 2;
+				  turn_amount = -2;
 			  }
 			  else if(degree == 5.0)
 			  {
-				  turn_counter  = turn_counter - 1;
+				  turn_amount = -1;
 			  }
 		  }
-
+		  if (turn_counter + turn_amount > TURN_MAX || turn_counter + turn_amount < TURN_MIN) {
+			  // We are being asked to overturn, give up on this target and move on
+			  global_status = 3;
+		  } else {
+			  // The turn looks good, execute
+			  stepper_step_angle(degree, direction);
+			  turn_counter += turn_amount;
+		  }
 	  }
 	  else if (global_status == 2)
 	  {
-		  int i;
 		  HAL_GPIO_WritePin(SPRAYER_PIN_CLASS, SPRAYER_CONTROL_PIN, GPIO_PIN_SET);
-		  for (i = 0; i < SPRAYER_DELAY; i ++);
-		  HAL_GPIO_WritePin(SPRAYER_PIN_CLASS, SPRAYER_CONTROL_PIN, GPIO_PIN_RESET);
-		  Stepper_Motor_Reset();
-		  motor_state_selector(MOTOR_F);
-		  for (i = 0; i < IGNORE_DELAY; i ++);
-		  spray_status = true;
+		  if (spray_time == -1) {
+			  spray_time = SPRAYER_DELAY;
+		  }
+		  if (spray_time != -1 && --spray_time == 0) {
+			  // We have finished spraying
+			  HAL_GPIO_WritePin(SPRAYER_PIN_CLASS, SPRAYER_CONTROL_PIN, GPIO_PIN_RESET);
+			  global_status = 3; // Reset
+		  }
 	  }
-	  else
+	  else if (global_status == 3) {
+		  // Reset the sprayer and move forward
+		  if (ignore_counter == -1) {
+			  // Initialize the ignore timer
+			  motor_state_selector(MOTOR_F);
+			  Stepper_Motor_Reset();
+			  ignore_counter = IGNORE_DELAY;
+		  }
+	  } else
 	  {
 		  motor_state_selector(5);
 	  }
@@ -354,6 +502,8 @@ int main(void)
 	  if (global_status == 1 && reset_counter > RESET_COUNT)
 	  {
 		  global_status = 0;
+		  Stepper_Motor_Reset();
+		  Counter_Init();
 	  }
 
 	  if (global_status == 1 && spray_counter_1 > CAMERA_HALT && spray_counter_2 > CAMERA_HALT)
@@ -361,10 +511,11 @@ int main(void)
 		  global_status = 2;
 	  }
 
-	  if (global_status == 2 && spray_status == 1)
+	  if (global_status == 3 && ignore_counter != -1 && --ignore_counter == 0)
 	  {
+		  ignore_counter = -1;
 		  global_status = 0;
-		  spray_status = false;
+		  Counter_Init();
 	  }
 
     /* USER CODE END WHILE */
