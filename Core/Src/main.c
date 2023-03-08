@@ -50,14 +50,17 @@
 #define MOTOR_BS        4
 
 #define TURN_MAX		12
-#define TURN_MIN	   -12
 
 #define CAMERA_HALT	    15
 
 // Number of milliseconds we want to ignore inputs during reset
-#define IGNORE_DELAY    5000
+#define IGNORE_DELAY    1000
 // Time to wait after we've lost the object to reset
 #define RESET_COUNT     500
+
+#define FULL_SPEED      4095
+#define HALF_SPEED      2048
+#define REALLY_SLOW     1024
 
 /* USER CODE END PD */
 
@@ -138,6 +141,8 @@ void loop_motor_wait(int ticks);
 // 3 - left
 // 4 - right
 void change_motor_state(short state);
+
+int abs(int x) { if (x < 0) return -x; return x; }
 
 // Takes the arm motor's current state and returns the
 // updated state with respect to the ARM global variable
@@ -459,7 +464,7 @@ int main(void)
 				  turn_amount = -1;
 			  }
 		  }
-		  if (turn_counter + turn_amount > TURN_MAX || turn_counter + turn_amount < TURN_MIN) {
+		  if (abs(turn_counter + turn_amount) > TURN_MAX) {
 			  // We are being asked to overturn, give up on this target and move on
 			  global_status = 3;
 		  } else {
@@ -899,32 +904,32 @@ void motor_state_selector(int state) {
 	  case 1:
 		  // Forward
 		  // 4095 correlates with max speed (100% duty cycle) in the forward direction,
-		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 4095);
-		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 4095);
+		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, HALF_SPEED);
+		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, HALF_SPEED);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);// PIN B15 off
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);// PIN B14 off
 		  return;
 	  case 2:
 		  // Forward slowly
 		  // 4095 correlates with max speed (100% duty cycle) in the forward direction,
-		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 2048);
-		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 2048);
+		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, REALLY_SLOW);
+		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, REALLY_SLOW);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);// PIN B15 off
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);// PIN B14 off
 		  return;
 	  case 3:
 		  // Backward
 		  // 2048 correlates with max speed (50% duty cycle) in the backward direction,
-		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 4095);
-		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 4095);
+		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, REALLY_SLOW);
+		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, REALLY_SLOW);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_SET);// PIN B15 on
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);// PIN B14 on
 		  return;
 	  case 4:
 		  // Backward
 		  // 2048 correlates with max speed (50% duty cycle) in the backward direction,
-		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 2048);
-		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 2048);
+		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, REALLY_SLOW);
+		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, REALLY_SLOW);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_SET);// PIN B15 on
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);// PIN B14 on
 		  return;
