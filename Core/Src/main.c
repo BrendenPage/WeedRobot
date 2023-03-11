@@ -51,7 +51,7 @@
 #define TURN_SMALL      2.5
 #define TURN_LARGE      5
 
-#define TURN_MAX		    24
+#define TURN_MAX		24
 
 #define CAMERA_HALT	    15
 
@@ -159,11 +159,6 @@ int check_aim(int state);
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-}
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-  memcpy(dma_tx_buffer, dma_rx_buffer, BUFFER_SIZE);
   if (global_status == 1)
   {
 	  //Check for Stepper motor command
@@ -250,6 +245,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	  }
 
   }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  memcpy(dma_tx_buffer, dma_rx_buffer, BUFFER_SIZE);
   HAL_UART_Receive_DMA(&huart2, dma_rx_buffer, BUFFER_SIZE);
 }
 
@@ -338,7 +338,7 @@ int main(void)
   HAL_ADC_Start_DMA(&hadc3, &VR, 1);
   DMA_Message_Init();
   HAL_UART_Receive_DMA(&huart2, dma_rx_buffer, BUFFER_SIZE);
-//  HAL_TIM_Base_Start_IT(&htim6);
+  HAL_TIM_Base_Start_IT(&htim6);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
   Global_Status_Init();
@@ -357,7 +357,7 @@ int main(void)
 	  if (global_status == 1)
 	  {
 		  // Rotate sprayer nozzle and track total degrees
-		  int turn_amount = 0;
+		  int16_t turn_amount = 0;
 		  if(direction == 0)
 		  {
 			  if(degree == TURN_LARGE)
@@ -411,7 +411,7 @@ int main(void)
 		  }
 	  } else
 	  {
-		  motor_state_selector(5);
+		  motor_state_selector(MOTOR_F);
 	  }
 
 
