@@ -368,13 +368,13 @@ void Stepper_Motor_Reset(void)
 	if(turn_counter < 0)
 	{
 		direction = 0;
-		degree = (float)(turn_counter * 5);
+		degree = (float)(turn_counter * 2);
 		stepper_step_angle(degree, direction);
 	}
 	else if (turn_counter > 0)
 	{
 		direction = 1;
-		degree = (float)(turn_counter * 5);
+		degree = (float)(turn_counter * 2);
 		stepper_step_angle(degree, direction);
 	}
 
