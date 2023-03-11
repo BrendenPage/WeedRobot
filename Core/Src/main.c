@@ -39,7 +39,7 @@
 #define SPRAYER_PIN_CLASS   GPIOB
 #define SPRAYER_CONTROL_PIN GPIO_PIN_12
 // Number of milliseconds we want to have the sprayer on for
-#define SPRAYER_DELAY       200
+#define SPRAYER_DELAY       1000
 
 // These defines list the pins for the
 // brushless motors that drive the chassis
@@ -48,8 +48,10 @@
 #define MOTOR_FS        2
 #define MOTOR_B         3
 #define MOTOR_BS        4
+#define TURN_SMALL      2.5
+#define TURN_LARGE      5
 
-#define TURN_MAX		12
+#define TURN_MAX		    24
 
 #define CAMERA_HALT	    15
 
@@ -157,94 +159,6 @@ int check_aim(int state);
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-//  memcpy(dma_rx_buffer, dma_tx_buffer, BUFFER_SIZE);
-//  if (global_status == 1)
-//  {
-//      //Check for Stepper motor command
-//	  if(dma_tx_buffer[0] == 'R')
-//	  {
-//		  direction = 1;
-//		  degree = 10.0;
-//		  spray_counter_1 = 0;
-//		  reset_counter = 0;
-//	  }
-//	  else if(dma_tx_buffer[0] == 'r')
-//	  {
-//		  direction = 1;
-//		  degree = 5.0;
-//		  spray_counter_1 = 0;
-//		  reset_counter = 0;
-//	  }
-//	  else if(dma_tx_buffer[0] == 'L')
-//	  {
-//		  direction = 0;
-//		  degree = 10.0;
-//		  spray_counter_1 = 0;
-//		  reset_counter = 0;
-//	  }
-//	  else if(dma_tx_buffer[0] == 'l')
-//	  {
-//		  direction = 0;
-//		  degree = 5.0;
-//		  spray_counter_1 = 0;
-//		  reset_counter = 0;
-//	  }
-//	  else if (dma_tx_buffer[0] == 'H')
-//	  {
-//		  direction = 2;
-//		  degree = 0.0;
-//		  reset_counter = 0;
-//		  if(spray_counter_1 <= CAMERA_HALT)
-//		  {
-//			  ++spray_counter_1;
-//		  }
-//	  }
-//	  else if (dma_tx_buffer[0] == 'M')
-//	  {
-//		  direction = 2;
-//		  degree = 0.0;
-//		  if (reset_counter <= RESET_COUNT)
-//		  {
-//			  ++reset_counter;
-//		  }
-//	  }
-//	  else
-//	  {
-//		  direction = 2;
-//		  degree = 0.0;
-//	  }
-//
-//
-//	  if(dma_tx_buffer[1] == 'F')
-//	  {
-//		  motor_state_selector(MOTOR_F);
-//		  spray_counter_2 = 0;
-//		  reset_counter = 0;
-//
-//	  }
-//	  else if(dma_tx_buffer[1] == 'S')
-//	  {
-//		  motor_state_selector(MOTOR_FS);
-//		  spray_counter_2 = 0;
-//		  reset_counter = 0;
-//	  }
-//	  else if(dma_tx_buffer[1] == 'H')
-//	  {
-//		  motor_state_selector(MOTOR_HALT);
-//		  reset_counter = 0;
-//		  if(spray_counter_2 <= CAMERA_HALT)
-//		  {
-//			  ++spray_counter_2;
-//		  }
-//	  }
-//	  else
-//	  {
-//		  // We did not detect the object, halt and wait for further info
-//		  motor_state_selector(MOTOR_HALT);
-//	  }
-//
-//  }
-
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
@@ -256,28 +170,28 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	  if(dma_tx_buffer[0] == 'R')
 	  {
 		  direction = 1;
-		  degree = 10.0;
+		  degree = TURN_LARGE;
 		  spray_counter_1 = 0;
 		  reset_counter = 0;
 	  }
 	  else if(dma_tx_buffer[0] == 'r')
 	  {
 		  direction = 1;
-		  degree = 5.0;
+		  degree = TURN_SMALL;
 		  spray_counter_1 = 0;
 		  reset_counter = 0;
 	  }
 	  else if(dma_tx_buffer[0] == 'L')
 	  {
 		  direction = 0;
-		  degree = 10.0;
+		  degree = TURN_LARGE;
 		  spray_counter_1 = 0;
 		  reset_counter = 0;
 	  }
 	  else if(dma_tx_buffer[0] == 'l')
 	  {
 		  direction = 0;
-		  degree = 5.0;
+		  degree = TURN_SMALL;
 		  spray_counter_1 = 0;
 		  reset_counter = 0;
 	  }
@@ -370,13 +284,13 @@ void Stepper_Motor_Reset(void)
 	if(turn_counter < 0)
 	{
 		direction = 0;
-		degree = (float)(turn_counter * 2);
+		degree = (float)(turn_counter * TURN_SMALL);
 		stepper_step_angle(degree, direction);
 	}
 	else if (turn_counter > 0)
 	{
 		direction = 1;
-		degree = (float)(turn_counter * 2);
+		degree = (float)(turn_counter * TURN_SMALL);
 		stepper_step_angle(degree, direction);
 	}
 
@@ -446,22 +360,22 @@ int main(void)
 		  int turn_amount = 0;
 		  if(direction == 0)
 		  {
-			  if(degree == 10.0)
+			  if(degree == TURN_LARGE)
 			  {
 				  turn_amount = 2;
 			  }
-			  else if(degree == 5.0)
+			  else if(degree == TURN_SMALL)
 			  {
 				  turn_amount = 1;
 			  }
 		  }
 		  else if (direction == 1)
 		  {
-			  if(degree == 10.0)
+			  if(degree == TURN_LARGE)
 			  {
 				  turn_amount = -2;
 			  }
-			  else if(degree == 5.0)
+			  else if(degree == TURN_SMALL)
 			  {
 				  turn_amount = -1;
 			  }
@@ -528,31 +442,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-//	if(finished_turn == 0)
-//	{
-//		stepper_step_angle(degree, direction);
-//		dma_rx_buffer[0] = 'H';
-//		dma_rx_buffer[1] = 'M';
-//		finished_turn = 1;
-//	}
-//	if (spray_counter != -1 && spray_counter != 0) spray_counter--;
-//    if (spray_counter == 0) {
-//      // Turn on the sprayer
-//      spray_counter = -1;
-//      HAL_GPIO_WritePin(SPRAYER_PIN_CLASS, SPRAYER_CONTROL_PIN, GPIO_PIN_SET);
-//      sprayer_delay = SPRAYER_DELAY;
-//    } else if (sprayer_delay == 0) {
-//      // Turn off the sprayer
-//      HAL_GPIO_WritePin(SPRAYER_PIN_CLASS, SPRAYER_CONTROL_PIN, GPIO_PIN_RESET);
-//      MOTOR_STATE_VAR = 1;
-//    } else {
-//    	sprayer_delay--;
-//    }
-//
-//    if (1) {
-//    	motor_state_selector(MOTOR_STATE_VAR);
-//    	motor_delay = MOTOR_DELAY;
-//    }
 
     HAL_Delay(1);
   }
@@ -1031,59 +920,6 @@ void stepper_half_drive (int step)
 
     }
 }
-
-
-//void change_motor_state(short state)
-//{
-//  switch(state){
-//    case 0:
-//    // Halt
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_RESET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_RESET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_RESET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_RESET);
-//    case 1:
-//    // Forward
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_SET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_RESET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_SET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_RESET);
-//    case 2:
-//    // Backward
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_RESET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_SET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_RESET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_SET);
-//    case 3:
-//    // Left
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_RESET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_SET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_SET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_RESET);
-//    case 4:
-//    // Left
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_1, GPIO_PIN_SET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_1, GPIO_PIN_RESET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_FORWARD_2, GPIO_PIN_RESET);
-//      HAL_GPIO_WritePin(MOTOR_PIN_CLASS, MOTOR_REVERSE_2, GPIO_PIN_SET);
-//  }
-//}
-
-//int check_aim(int state) {
-//  // Get ADC value
-//  if (AIM == 1) {
-//    if (state == 0) {
-//      state = 7;
-//    } else {
-//      state--;
-//    }
-//  } else if (AIM == 2) {
-//    state = (state + 1) % 8;
-//  }
-//  return state;
-//}
-
-
 
 /* USER CODE END 4 */
 
