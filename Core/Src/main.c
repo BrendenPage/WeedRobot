@@ -49,9 +49,9 @@
 #define MOTOR_B         3
 #define MOTOR_BS        4
 #define TURN_SMALL      2.5
-#define TURN_LARGE      5
+#define TURN_LARGE      (TURN_SMALL * 2)
 
-#define TURN_MAX		    24
+#define TURN_MAX		    ((int)(60/TURN_SMALL))
 
 #define CAMERA_HALT	    15
 
