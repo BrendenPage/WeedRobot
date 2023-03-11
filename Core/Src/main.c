@@ -356,6 +356,8 @@ void Counter_Init(void)
 	reset_counter = 0;
 	ignore_counter = -1;
 	turn_counter = 0;
+	direction = 2;
+	degree = 0;
 }
 
 void Global_Status_Init(void)
